@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; text-align: center; }
+        .content { padding: 20px; background: #f9f9f9; }
+        .status { padding: 10px; border-radius: 5px; text-align: center; font-weight: bold; }
+        .status.applied { background: #e3f2fd; color: #1976d2; }
+        .status.shortlisted { background: #e8f5e8; color: #2e7d32; }
+        .status.rejected { background: #ffebee; color: #c62828; }
+        .status.hired { background: #e8f5e8; color: #2e7d32; }
+        .footer { text-align: center; padding: 20px; color: #666; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>NextHire</h1>
+            <p>Application Status Update</p>
+        </div>
+        <div class="content">
+            <h2>Hello <%= applicantName %>,</h2>
+            <p>Your application for <strong><%= jobTitle %></strong> has been updated.</p>
+            
+            <div class="status <%= status %>">
+                Status: <%= status.toUpperCase() %>
+            </div>
+            
+            <% if (note) { %>
+                <p><strong>Note from employer:</strong> <%= note %></p>
+            <% } %>
+            
+            <p>You can view your application status by logging into your NextHire account.</p>
+            
+            <p>Best regards,<br><%= employerName %></p>
+        </div>
+        <div class="footer">
+            <p>&copy; 2024 NextHire. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>

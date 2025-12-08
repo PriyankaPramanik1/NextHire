@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %> - NextHire Admin</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root { --sidebar-width: 250px; --navbar-height: 60px; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8f9fc; }
+        #sidebar { position: fixed; top: 0; left: 0; height: 100vh; width: var(--sidebar-width); background: linear-gradient(180deg, #667eea 0%, #764ba2 100%); z-index: 1000; overflow-y: auto; }
+        .sidebar-brand { padding: 20px; text-align: center; background: rgba(0,0,0,0.1); }
+        .sidebar-brand h3 { color: white; margin: 0; font-weight: 700; }
+        .sidebar-menu a { display: flex; align-items: center; padding: 15px 25px; color: rgba(255,255,255,0.9); text-decoration: none; border-left: 4px solid transparent; }
+        .sidebar-menu a:hover, .sidebar-menu a.active { background: rgba(255,255,255,0.2); border-left-color: white; color: white; }
+        .sidebar-menu a i { width: 30px; font-size: 18px; }
+        #navbar { position: fixed; top: 0; left: var(--sidebar-width); right: 0; height: var(--navbar-height); background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1); display: flex; align-items: center; justify-content: space-between; padding: 0 30px; z-index: 999; }
+        .admin-info { display: flex; align-items: center; gap: 10px; }
+        .admin-avatar { width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, #667eea, #764ba2); display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; }
+        .btn-logout { background: linear-gradient(135deg, #dc3545, #c82333); color: white; border: none; padding: 8px 20px; border-radius: 6px; }
+        #content { margin-left: var(--sidebar-width); margin-top: var(--navbar-height); padding: 30px; min-height: calc(100vh - var(--navbar-height)); }
+        .table-card { border: none; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        #footer { margin-left: var(--sidebar-width); background: white; padding: 20px 30px; text-align: center; border-top: 1px solid #e3e6f0; }
+        .btn-action { padding: 5px 10px; border-radius: 5px; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div id="sidebar">
+        <div class="sidebar-brand">
+            <h3><i class="fas fa-briefcase"></i> NextHire</h3>
+            <p class="text-white-50 mb-0">Admin Dashboard</p>
+        </div>
+        <nav class="sidebar-menu">
+            <a href="/admin/dashboard"><i class="fas fa-tachometer-alt"></i><span>Dashboard</span></a>
+            <a href="/admin/job-seekers" class="active"><i class="fas fa-users"></i><span>Job Seekers</span></a>
+            <a href="/admin/employers"><i class="fas fa-building"></i><span>Employers</span></a>
+            <a href="/admin/create-employer"><i class="fas fa-user-plus"></i><span>Create Employer</span></a>
+            <a href="/admin/jobs"><i class="fas fa-briefcase"></i><span>Jobs</span></a>
+        </nav>
+    </div>
+
+    <nav id="navbar">
+        <h5 class="mb-0"><%= title %></h5>
+        <div class="navbar-right d-flex align-items-center gap-3">
+            <div class="admin-info">
+                <div class="admin-avatar">A</div>
+                <div>
+                    <div class="fw-bold">Admin</div>
+                    <small class="text-muted">priyanka@gmail.com</small>
+                </div>
+            </div>
+            <a href="/admin/logout" class="btn btn-logout">
+                <i class="fas fa-sign-out-alt me-1"></i> Logout
+            </a>
+        </div>
+    </nav>
+
+    <main id="content">
+        <% if (typeof success !== 'undefined' && success) { %>
+            <div class="alert alert-success alert-dismissible fade show">
+                <i class="fas fa-check-circle me-2"></i><%= success %>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        <% } %>
+        <% if (typeof error !== 'undefined' && error) { %>
+            <div class="alert alert-danger alert-dismissible fade show">
+                <i class="fas fa-exclamation-circle me-2"></i><%= error %>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        <% } %>
+
+        <div class="card table-card">
+            <div class="card-header bg-white py-3">
+                <div class="row align-items-center">
+                    <div class="col-md-6">
+                        <h5 class="mb-0"><i class="fas fa-users text-primary me-2"></i>Job Seekers Management</h5>
+                    </div>
+                    <div class="col-md-6">
+                        <form action="/admin/job-seekers" method="GET" class="d-flex gap-2">
+                            <input type="text" name="search" class="form-control" placeholder="Search by name, email..." value="<%= typeof search !== 'undefined' ? search : '' %>">
+                            <select name="status" class="form-select">
+                                <option value="">All Status</option>
+                                <option value="verified" <%= typeof status !== 'undefined' && status === 'verified' ? 'selected' : '' %>>Verified</option>
+                                <option value="unverified" <%= typeof status !== 'undefined' && status === 'unverified' ? 'selected' : '' %>>Unverified</option>
+                            </select>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-search"></i>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Name</th>
+                                <th>Email</th>
+                                <th>Title</th>
+                                <th>Location</th>
+                                <th>Skills</th>
+                                <th>Applications</th>
+                                <th>Status</th>
+                                <th>Joined</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% if (jobSeekers && jobSeekers.length > 0) { %>
+                                <% jobSeekers.forEach(seeker => { %>
+                                    <tr>
+                                        <td><%= seeker.name %></td>
+                                        <td><%= seeker.email %></td>
+                                        <td><%= seeker.profile && seeker.profile.title ? seeker.profile.title : 'N/A' %></td>
+                                        <td><%= seeker.profile && seeker.profile.location ? seeker.profile.location : 'N/A' %></td>
+                                        <td>
+                                            <% if (seeker.profile && seeker.profile.skills && seeker.profile.skills.length > 0) { %>
+                                                <span class="badge bg-info"><%= seeker.profile.skills.length %> skills</span>
+                                            <% } else { %>
+                                                <span class="text-muted">None</span>
+                                            <% } %>
+                                        </td>
+                                        <td><%= seeker.applicationCount || 0 %></td>
+                                        <td>
+                                            <% if (seeker.isVerified) { %>
+                                                <span class="badge bg-success"><i class="fas fa-check"></i> Verified</span>
+                                            <% } else { %>
+                                                <span class="badge bg-warning"><i class="fas fa-clock"></i> Unverified</span>
+                                            <% } %>
+                                            <% if (seeker.isActive === false) { %>
+                                                <span class="badge bg-danger"><i class="fas fa-ban"></i> Inactive</span>
+                                            <% } %>
+                                        </td>
+                                        <td><%= new Date(seeker.createdAt).toLocaleDateString() %></td>
+                                        <td>
+                                            <div class="btn-group">
+                                                <a href="/admin/job-seeker/<%= seeker._id %>" class="btn btn-sm btn-info btn-action">
+                                                    <i class="fas fa-eye"></i>
+                                                </a>
+                                                <form action="/admin/job-seeker/<%= seeker._id %>/toggle-status" method="POST" class="d-inline" onsubmit="return confirm('Are you sure?')">
+                                                    <button type="submit" class="btn btn-sm <%= seeker.isActive !== false ? 'btn-danger' : 'btn-success' %> btn-action">
+                                                        <i class="fas fa-<%= seeker.isActive !== false ? 'ban' : 'check' %>"></i>
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                <% }); %>
+                            <% } else { %>
+                                <tr>
+                                    <td colspan="9" class="text-center py-4">
+                                        <i class="fas fa-inbox fa-3x text-muted mb-3 d-block"></i>
+                                        <p class="text-muted mb-0">No job seekers found</p>
+                                    </td>
+                                </tr>
+                            <% } %>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <% if (totalPages > 1) { %>
+                <div class="card-footer bg-white">
+                    <nav>
+                        <ul class="pagination mb-0 justify-content-center">
+                            <% if (currentPage > 1) { %>
+                                <li class="page-item">
+                                    <a class="page-link" href="?page=<%= currentPage - 1 %>&search=<%= search %>&status=<%= status %>">Previous</a>
+                                </li>
+                            <% } %>
+                            <% for (let i = 1; i <= totalPages; i++) { %>
+                                <li class="page-item <%= currentPage === i ? 'active' : '' %>">
+                                    <a class="page-link" href="?page=<%= i %>&search=<%= search %>&status=<%= status %>"><%= i %></a>
+                                </li>
+                            <% } %>
+                            <% if (currentPage < totalPages) { %>
+                                <li class="page-item">
+                                    <a class="page-link" href="?page=<%= currentPage + 1 %>&search=<%= search %>&status=<%= status %>">Next</a>
+                                </li>
+                            <% } %>
+                        </ul>
+                    </nav>
+                </div>
+            <% } %>
+        </div>
+    </main>
+
+    <footer id="footer">
+        <p class="mb-0">&copy; <%= new Date().getFullYear() %> NextHire Job Portal. All rights reserved.</p>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
