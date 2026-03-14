@@ -1,132 +1,109 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useRef } from 'react';
-import { useAuth } from '@/context/AuthContext';
-import { useSocket } from '@/context/SocketContext';
+import { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
+import axios from "@/lib/axios";
+import { useSocket } from "@/context/SocketContext";
 import {
-  Container,
-  Typography,
-  Grid,
+  Box,
   Card,
   CardContent,
+  Typography,
   TextField,
   Button,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemAvatar,
   Avatar,
-  Box,
-  Paper,
-  Divider,
-  Chip,
-} from '@mui/material';
-import { Send, Person } from '@mui/icons-material';
-import { styled } from '@mui/system';
-import axios from '@/lib/axios';
+  List,
+  ListItemAvatar,
+  ListItemText,
+  IconButton,
+  Badge,
+  InputAdornment,
+  LinearProgress,
+  ListItemButton,
+} from "@mui/material";
+import {
+  Send,
+  Search,
+  AttachFile,
+  EmojiEmotions,
+  MoreVert,
+  Videocam,
+  Phone,
+  ArrowBack,
+} from "@mui/icons-material";
+import { Grid, styled } from "@mui/system";
+import Swal from "sweetalert2";
 
-const ChatContainer = styled(Paper)({
-  height: '70vh',
-  display: 'flex',
-  flexDirection: 'column',
-});
-
-const MessagesContainer = styled(Box)({
-  flex: 1,
-  overflowY: 'auto',
-  padding: '1rem',
+const ChatContainer = styled(Box)({
+  height: "calc(100vh - 200px)",
+  display: "flex",
+  flexDirection: "column",
 });
 
 const MessageBubble = styled(Box)(({ isOwn }: { isOwn: boolean }) => ({
-  maxWidth: '70%',
-  marginBottom: '1rem',
-  marginLeft: isOwn ? 'auto' : '0',
-  marginRight: isOwn ? '0' : 'auto',
+  maxWidth: "70%",
+  padding: "12px 16px",
+  borderRadius: "18px",
+  backgroundColor: isOwn ? "#667eea" : "#f1f5f9",
+  color: isOwn ? "white" : "inherit",
+  alignSelf: isOwn ? "flex-end" : "flex-start",
+  marginBottom: "8px",
+  wordBreak: "break-word",
 }));
 
-const MessageContent = styled(Paper)(({ isOwn }: { isOwn: boolean }) => ({
-  padding: '0.75rem 1rem',
-  backgroundColor: isOwn ? '#667eea' : '#f5f5f5',
-  color: isOwn ? 'white' : 'inherit',
-}));
-
-interface Conversation {
-  user: {
-    _id: string;
-    name: string;
-    profilePicture?: {
-      url: string;
-    };
-    role: string;
-  };
-  lastMessage: {
-    content: string;
-    createdAt: string;
-    sender: string;
-  };
-  unreadCount: number;
-}
-
-interface Message {
-  _id: string;
-  sender: {
-    _id: string;
-    name: string;
-    profilePicture?: {
-      url: string;
-    };
-  };
-  recipient: {
-    _id: string;
-    name: string;
-    profilePicture?: {
-      url: string;
-    };
-  };
-  content: string;
-  createdAt: string;
-  read: boolean;
-}
-
-export default function ChatPage() {
-  const { user } = useAuth();
+export default function EmployerChat() {
+  const router = useRouter();
   const { socket, isConnected } = useSocket();
-  const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [newMessage, setNewMessage] = useState('');
+  const [conversations, setConversations] = useState<any[]>([]);
+  const [selectedConversation, setSelectedConversation] = useState<any>(null);
+  const [messages, setMessages] = useState<any[]>([]);
+  const [newMessage, setNewMessage] = useState("");
   const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetchConversations();
   }, []);
 
   useEffect(() => {
-    if (selectedConversation && socket) {
-      // Join the chat room
-      socket.emit('join_chat', { recipientId: selectedConversation.user._id });
-
-      // Fetch messages for this conversation
+    if (selectedConversation) {
       fetchMessages(selectedConversation.user._id);
-
-      // Mark messages as read
-      socket.emit('mark_messages_read', { senderId: selectedConversation.user._id });
     }
-  }, [selectedConversation, socket]);
+  }, [selectedConversation]);
 
   useEffect(() => {
     if (socket) {
-      // Listen for new messages
-      socket.on('receive_message', handleNewMessage);
-      socket.on('messages_read', handleMessagesRead);
+      socket.on("receive_message", (message: any) => {
+        if (
+          selectedConversation &&
+          message.sender === selectedConversation.user._id
+        ) {
+          setMessages((prev) => [...prev, message]);
+          markAsRead(message._id);
+        }
+        updateConversationList(message);
+      });
+
+      socket.on("new_message_notification", (notification: any) => {
+        Swal.fire({
+          title: "New Message",
+          text: notification.message,
+          icon: "info",
+          toast: true,
+          position: "top-right",
+          showConfirmButton: false,
+          timer: 3000,
+        });
+      });
 
       return () => {
-        socket.off('receive_message', handleNewMessage);
-        socket.off('messages_read', handleMessagesRead);
+        socket.off("receive_message");
+        socket.off("new_message_notification");
       };
     }
-  }, [socket]);
+  }, [socket, selectedConversation]);
 
   useEffect(() => {
     scrollToBottom();
@@ -134,159 +111,195 @@ export default function ChatPage() {
 
   const fetchConversations = async () => {
     try {
-      const response = await axios.get('/chat/conversations');
+      const response = await axios.get("/chat/conversations");
       setConversations(response.data);
     } catch (error) {
-      console.error('Error fetching conversations:', error);
+      console.error("Error fetching conversations:", error);
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchMessages = async (recipientId: string) => {
+  const fetchMessages = async (userId: string) => {
     try {
-      const response = await axios.get(`/chat/messages/${recipientId}`);
+      const response = await axios.get(`/chat/messages/${userId}`);
       setMessages(response.data);
     } catch (error) {
-      console.error('Error fetching messages:', error);
+      console.error("Error fetching messages:", error);
     }
   };
 
-  const handleNewMessage = (message: Message) => {
-    setMessages(prev => [...prev, message]);
-    
-    // Update conversations list
-    setConversations(prev => 
-      prev.map(conv => 
-        conv.user._id === message.sender._id 
-          ? { 
-              ...conv, 
-              lastMessage: {
-                content: message.content,
-                createdAt: message.createdAt,
-                sender: message.sender._id
-              },
-              unreadCount: message.sender._id === selectedConversation?.user._id ? 0 : conv.unreadCount + 1
-            } 
-          : conv
-      )
-    );
+  const updateConversationList = (message: any) => {
+    setConversations((prev) => {
+      const updated = [...prev];
+      const index = updated.findIndex(
+        (conv) =>
+          conv.user._id === message.sender ||
+          conv.user._id === message.recipient
+      );
+
+      if (index !== -1) {
+        updated[index] = {
+          ...updated[index],
+          lastMessage: message,
+          unreadCount:
+            message.sender !== selectedConversation?.user._id
+              ? (updated[index].unreadCount || 0) + 1
+              : 0,
+        };
+        // Move to top
+        const [moved] = updated.splice(index, 1);
+        updated.unshift(moved);
+      }
+
+      return updated;
+    });
   };
 
-  const handleMessagesRead = (data: { readerId: string }) => {
-    // Update read status for messages
-    setMessages(prev =>
-      prev.map(msg =>
-        msg.sender._id === data.readerId ? { ...msg, read: true } : msg
-      )
-    );
+  const markAsRead = async (messageId: string) => {
+    try {
+      await axios.put(`/chat/messages/${messageId}/read`);
+    } catch (error) {
+      console.error("Error marking message as read:", error);
+    }
   };
 
-  const sendMessage = () => {
-    if (!newMessage.trim() || !selectedConversation || !socket) return;
+  const sendMessage = async () => {
+    if (!newMessage.trim() || !selectedConversation) return;
 
-    const messageData = {
-      recipientId: selectedConversation.user._id,
-      content: newMessage.trim(),
-    };
+    try {
+      const messageData = {
+        recipient: selectedConversation.user._id,
+        content: newMessage.trim(),
+      };
 
-    socket.emit('send_message', messageData);
-    setNewMessage('');
+      if (socket && isConnected) {
+        socket.emit("send_message", messageData);
+      }
+
+      const response = await axios.post("/chat/send", messageData);
+
+      // Add to local messages
+      setMessages((prev) => [...prev, response.data.message]);
+      setNewMessage("");
+
+      // Update conversation list
+      updateConversationList(response.data.message);
+    } catch (error) {
+      console.error("Error sending message:", error);
+      Swal.fire("Error!", "Failed to send message.", "error");
+    }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
+  const handleFileUpload = async (file: File) => {
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("recipient", selectedConversation.user._id);
+
+      const response = await axios.post("/chat/upload", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+
+      setMessages((prev) => [...prev, response.data.message]);
+      updateConversationList(response.data.message);
+    } catch (error) {
+      Swal.fire("Error!", "Failed to upload file.", "error");
     }
   };
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  const formatTime = (dateString: string) => {
-    return new Date(dateString).toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
+  const filteredConversations = conversations.filter(
+    (conv) =>
+      conv.user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      conv.lastMessage?.content
+        ?.toLowerCase()
+        .includes(searchTerm.toLowerCase())
+  );
+
+  if (loading) {
+    return (
+      <Box
+        display="flex"
+        justifyContent="center"
+        alignItems="center"
+        height="80vh"
+      >
+        <LinearProgress sx={{ width: "50%", height: 8, borderRadius: 4 }} />
+      </Box>
+    );
+  }
 
   return (
-    <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
-      <Typography variant="h4" gutterBottom>
+    <Box>
+      <Typography variant="h4" fontWeight="700" mb={3}>
         Messages
-      </Typography>
-      <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
-        Connect with employers and discuss opportunities
       </Typography>
 
       <Grid container spacing={3}>
         {/* Conversations List */}
-        <Grid size={{xs:12, md:4}} >
-          <Card>
+        <Grid size={{ xs: 12, md: 4 }}>
+          <Card sx={{ height: "calc(100vh - 200px)" }}>
             <CardContent>
-              <Typography variant="h6" gutterBottom>
-                Conversations
-              </Typography>
-              <List>
-                {conversations.map((conversation) => (
-                  <ListItem
+              {/* Search */}
+              <TextField
+                fullWidth
+                placeholder="Search conversations..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Search />
+                    </InputAdornment>
+                  ),
+                }}
+                sx={{ mb: 2 }}
+              />
+
+              {/* Conversations */}
+              <List sx={{ overflow: "auto", maxHeight: "calc(100vh - 300px)" }}>
+                {filteredConversations.map((conversation) => (
+                  <ListItemButton
                     key={conversation.user._id}
-                    button
-                    selected={selectedConversation?.user._id === conversation.user._id}
+                    selected={
+                      selectedConversation?.user._id === conversation.user._id
+                    }
                     onClick={() => setSelectedConversation(conversation)}
                     sx={{
-                      borderRadius: 1,
+                      borderRadius: 2,
                       mb: 1,
-                      '&.Mui-selected': {
-                        backgroundColor: '#667eea',
-                        color: 'white',
-                        '&:hover': {
-                          backgroundColor: '#5a6fd8',
-                        },
+                      "&.Mui-selected": {
+                        backgroundColor: "#667eea15",
                       },
                     }}
                   >
                     <ListItemAvatar>
-                      <Avatar
-                        src={conversation.user.profilePicture?.url}
-                        sx={{
-                          bgcolor: conversation.user.role === 'employer' ? '#ff6b35' : '#667eea',
-                        }}
+                      <Badge
+                        badgeContent={conversation.unreadCount}
+                        color="error"
+                        invisible={!conversation.unreadCount}
                       >
-                        <Person />
-                      </Avatar>
-                    </ListItemAvatar>
-                    <ListItemText
-                      primary={
-                        <Box display="flex" justifyContent="space-between" alignItems="center">
-                          <Typography variant="subtitle1">
-                            {conversation.user.name}
-                          </Typography>
-                          {conversation.unreadCount > 0 && (
-                            <Chip
-                              label={conversation.unreadCount}
-                              size="small"
-                              color="primary"
-                            />
-                          )}
-                        </Box>
-                      }
-                      secondary={
-                        <Typography
-                          variant="body2"
-                          sx={{
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                          }}
+                        <Avatar
+                          src={conversation.user.profile?.profilePicture?.url}
                         >
-                          {conversation.lastMessage.content}
-                        </Typography>
+                          {conversation.user.name.charAt(0)}
+                        </Avatar>
+                      </Badge>
+                    </ListItemAvatar>
+
+                    <ListItemText
+                      primary={conversation.user.name}
+                      secondary={
+                        conversation.lastMessage?.content || "No messages yet"
                       }
                     />
-                  </ListItem>
+                  </ListItemButton>
                 ))}
               </List>
             </CardContent>
@@ -294,100 +307,151 @@ export default function ChatPage() {
         </Grid>
 
         {/* Chat Area */}
-        <Grid size={{xs:12, md:8}} >
-          <ChatContainer>
-            {selectedConversation ? (
-              <>
+        <Grid size={{ xs: 12, md: 8 }}>
+          {selectedConversation ? (
+            <Card sx={{ height: "calc(100vh - 200px)" }}>
+              <CardContent
+                sx={{
+                  height: "100%",
+                  display: "flex",
+                  flexDirection: "column",
+                }}
+              >
+                {/* Chat Header */}
                 <Box
-                  sx={{
-                    p: 2,
-                    borderBottom: 1,
-                    borderColor: 'divider',
-                    backgroundColor: '#f8f9fa',
-                  }}
+                  display="flex"
+                  alignItems="center"
+                  mb={2}
+                  pb={2}
+                  borderBottom={1}
+                  borderColor="divider"
                 >
-                  <Typography variant="h6">
-                    {selectedConversation.user.name}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {selectedConversation.user.role}
-                  </Typography>
+                  <IconButton
+                    onClick={() => setSelectedConversation(null)}
+                    sx={{ mr: 2, display: { md: "none" } }}
+                  >
+                    <ArrowBack />
+                  </IconButton>
+                  <Avatar
+                    src={selectedConversation.user.profile?.profilePicture?.url}
+                    sx={{ mr: 2 }}
+                  >
+                    {selectedConversation.user.name.charAt(0)}
+                  </Avatar>
+                  <Box flexGrow={1}>
+                    <Typography variant="h6" fontWeight="600">
+                      {selectedConversation.user.name}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {selectedConversation.user.profile?.title || "Job Seeker"}
+                    </Typography>
+                  </Box>
+                  <Box>
+                    <IconButton>
+                      <Phone />
+                    </IconButton>
+                    <IconButton>
+                      <Videocam />
+                    </IconButton>
+                    <IconButton>
+                      <MoreVert />
+                    </IconButton>
+                  </Box>
                 </Box>
 
-                <MessagesContainer>
+                {/* Messages */}
+                <Box flexGrow={1} overflow="auto" p={2}>
                   {messages.map((message) => (
                     <MessageBubble
                       key={message._id}
-                      isOwn={message.sender._id === user?.id}
+                      isOwn={
+                        message.sender?._id !== selectedConversation.user._id
+                      }
                     >
-                      <MessageContent isOwn={message.sender._id === user?.id}>
-                        <Typography variant="body1">{message.content}</Typography>
-                        <Typography
-                          variant="caption"
-                          sx={{
-                            display: 'block',
-                            mt: 0.5,
-                            opacity: 0.8,
-                          }}
-                        >
-                          {formatTime(message.createdAt)}
-                        </Typography>
-                      </MessageContent>
+                      <Typography variant="body1">{message.content}</Typography>
+                      <Typography
+                        variant="caption"
+                        sx={{ opacity: 0.8, display: "block", mt: 0.5 }}
+                      >
+                        {new Date(message.createdAt).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                        {message.read && " ✓✓"}
+                      </Typography>
                     </MessageBubble>
                   ))}
                   <div ref={messagesEndRef} />
-                </MessagesContainer>
+                </Box>
 
-                <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider' }}>
+                {/* Message Input */}
+                <Box mt={2} pt={2} borderTop={1} borderColor="divider">
                   <Box display="flex" gap={1}>
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      style={{ display: "none" }}
+                      onChange={(e) => {
+                        if (e.target.files?.[0]) {
+                          handleFileUpload(e.target.files[0]);
+                        }
+                      }}
+                    />
+                    <IconButton onClick={() => fileInputRef.current?.click()}>
+                      <AttachFile />
+                    </IconButton>
                     <TextField
                       fullWidth
-                      multiline
-                      maxRows={3}
-                      placeholder="Type your message..."
+                      placeholder="Type a message..."
                       value={newMessage}
                       onChange={(e) => setNewMessage(e.target.value)}
-                      onKeyPress={handleKeyPress}
-                      disabled={!isConnected}
+                      onKeyPress={(e) =>
+                        e.key === "Enter" && !e.shiftKey && sendMessage()
+                      }
+                      multiline
+                      maxRows={3}
                     />
+                    <IconButton>
+                      <EmojiEmotions />
+                    </IconButton>
                     <Button
                       variant="contained"
-                      endIcon={<Send />}
                       onClick={sendMessage}
-                      disabled={!newMessage.trim() || !isConnected}
-                      sx={{ minWidth: '100px' }}
+                      disabled={!newMessage.trim()}
+                      sx={{
+                        background:
+                          "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                        minWidth: "auto",
+                        px: 3,
+                      }}
                     >
-                      Send
+                      <Send />
                     </Button>
                   </Box>
-                  {!isConnected && (
-                    <Typography
-                      variant="caption"
-                      color="error"
-                      sx={{ mt: 1, display: 'block' }}
-                    >
-                      Connection lost. Reconnecting...
-                    </Typography>
-                  )}
                 </Box>
-              </>
-            ) : (
-              <Box
-                display="flex"
-                justifyContent="center"
-                alignItems="center"
-                height="100%"
-                flexDirection="column"
-              >
-                <Person sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
-                <Typography variant="h6" color="text.secondary">
-                  Select a conversation to start messaging
+              </CardContent>
+            </Card>
+          ) : (
+            <Card
+              sx={{
+                height: "calc(100vh - 200px)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <CardContent sx={{ textAlign: "center" }}>
+                <Typography variant="h6" color="text.secondary" gutterBottom>
+                  Select a conversation to start chatting
                 </Typography>
-              </Box>
-            )}
-          </ChatContainer>
+                <Typography variant="body2" color="text.secondary">
+                  Choose a conversation from the list to view messages
+                </Typography>
+              </CardContent>
+            </Card>
+          )}
         </Grid>
       </Grid>
-    </Container>
+    </Box>
   );
 }
